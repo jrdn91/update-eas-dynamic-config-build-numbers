@@ -9,7 +9,7 @@ inputs:
   configPath:
     description: 'The location of your app config file'
     required: false
-    default: './app-config.js'
+    default: './app.config.js'
   updateIos:
     description: 'Weather or not to run the update for iOS buildNumber'
     required: false
