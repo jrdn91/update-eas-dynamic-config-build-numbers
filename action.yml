@@ -1,23 +1,31 @@
-name: 'The name of your action here'
-description: 'Provide a description here'
-author: 'Your name or organization here'
-
-# Add your action's branding here. This will appear on the GitHub Marketplace.
-branding:
-  icon: 'heart'
-  color: 'red'
+name: 'Update EAS Dynamic Config Build Numbers'
+description:
+  'An action to update buildNumber and versionCode when using a dynamic app
+  config file'
+author: 'Jordan Riser'
 
 # Define your inputs here.
 inputs:
-  milliseconds:
-    description: 'Your input description here'
-    required: true
-    default: '1000'
+  configPath:
+    description: 'The location of your app config file'
+    required: false
+    default: './app-config.js'
+  updateIos:
+    description: 'Weather or not to run the update for iOS buildNumber'
+    required: false
+    default: true
+  updateAndroid:
+    description: 'Weather or not to run the update for android versionCode'
+    required: false
+    default: true
 
-# Define your outputs here.
 outputs:
-  time:
-    description: 'Your output description here'
+  newIosBuildNumber:
+    description:
+      'The build number that was updated if updateIos was set to true'
+  newAndroidVersionCode:
+    description:
+      'The version code that was updated if updateAndroid was set to true'
 
 runs:
   using: node20

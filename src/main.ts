@@ -1,5 +1,8 @@
 import * as core from '@actions/core'
-import { wait } from './wait'
+import * as fs from 'fs'
+import * as parser from '@babel/parser'
+import traverse from '@babel/traverse'
+import generator from '@babel/generator'
 
 /**
  * The main function for the action.
@@ -7,18 +10,82 @@ import { wait } from './wait'
  */
 export async function run(): Promise<void> {
   try {
-    const ms: string = core.getInput('milliseconds')
+    const filePath: string = core.getInput('configPath')
+    const updateIos: boolean = core.getInput('updateIos') === 'true'
+    const updateAndroid: boolean = core.getInput('updateAndroid') === 'true'
+    core.debug(`File path: ${filePath}`)
 
-    // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
-    core.debug(`Waiting ${ms} milliseconds ...`)
+    if (!updateIos && !updateAndroid) {
+      return core.setFailed('At least one platform must be selected')
+    }
 
-    // Log the current timestamp, wait, then log the new timestamp
-    core.debug(new Date().toTimeString())
-    await wait(parseInt(ms, 10))
-    core.debug(new Date().toTimeString())
+    // Read the file content
+    const code = fs.readFileSync(filePath, 'utf-8')
 
-    // Set outputs for other workflow steps to use
-    core.setOutput('time', new Date().toTimeString())
+    core.debug(`Read the file`)
+
+    // Parse the code into an AST (Abstract Syntax Tree)
+    const ast = parser.parse(code, {
+      sourceType: 'module'
+    })
+
+    core.debug(`Created AST from the code`)
+
+    // Update the AST
+    traverse(ast, {
+      enter(path) {
+        // Update ios build number
+        if (
+          updateIos &&
+          path.node.type === 'ObjectProperty' &&
+          path.node.key.type === 'Identifier' &&
+          path.node.key.name === 'buildNumber' &&
+          path.parentPath?.node.type === 'ObjectExpression' &&
+          path.parentPath.parentPath?.node.type === 'ObjectProperty' &&
+          path.parentPath.parentPath.node.key.type === 'Identifier' &&
+          path.parentPath.parentPath.node.key.name === 'ios'
+        ) {
+          const newBuildNumber =
+            // @ts-expect-error: Not sure why TS doesn't understand this here
+            (parseFloat(path.node.value.value) + 1).toString()
+          // @ts-expect-error: Not sure why TS doesn't understand this here
+          path.node.value.value = newBuildNumber
+
+          core.debug(`Updated iOS build number`)
+          core.setOutput('newIosBuildNumber', newBuildNumber)
+        }
+
+        // Update android version code
+        if (
+          updateAndroid &&
+          path.node.type === 'ObjectProperty' &&
+          path.node.key.type === 'Identifier' &&
+          path.node.key.name === 'versionCode' &&
+          path.parentPath?.node.type === 'ObjectExpression' &&
+          path.parentPath.parentPath?.node.type === 'ObjectProperty' &&
+          path.parentPath.parentPath.node.key.type === 'Identifier' &&
+          path.parentPath.parentPath.node.key.name === 'android'
+        ) {
+          const newVersionCode =
+            // @ts-expect-error: Not sure why TS doesn't understand this here
+            (parseFloat(path.node.value.value) + 1).toString()
+          // @ts-expect-error: Not sure why TS doesn't understand this here
+          path.node.value.value = newVersionCode
+          core.debug(`Updated Android version code`)
+          core.setOutput('newAndroidVersionCode', newVersionCode)
+        }
+      }
+    })
+
+    // Generate updated code from the modified AST
+    const updatedCode = generator(ast).code
+
+    core.debug(`Generated the updated code`)
+
+    // Write the updated code back to the file
+    fs.writeFileSync(filePath, updatedCode)
+
+    core.debug(`Wrote the updated code to the file`)
   } catch (error) {
     // Fail the workflow run if an error occurs
     if (error instanceof Error) core.setFailed(error.message)
